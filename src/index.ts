@@ -17,6 +17,17 @@ import signale from "signale";
 
 const packageJson = require('../package.json');
 
+// Every command's action handler is an async connection.update listener
+// (socket.ev.on('connection.update', async (update) => {...})) — an
+// EventEmitter doesn't await or catch listener rejections, so any failed
+// await inside one (e.g. a Baileys-internal query timing out) would
+// otherwise crash the process with a raw, unhandled stack trace instead of
+// a clean, actionable message.
+process.on('unhandledRejection', (err: any) => {
+    signale.error(err?.message || err);
+    process.exit(1);
+});
+
 program.name('mudslide').version(packageJson.version);
 program.option('-c, --cache <folder>', 'Override cache folder');
 
