@@ -8,6 +8,7 @@ import {
     initWASocket,
     isLoggedOutDisconnect,
     parseGeoLocation,
+    resolveLidRecipient,
     sendFileHelper,
     sendImageHelper,
     terminate
@@ -38,7 +39,7 @@ export async function sendMessage(recipient: string, message: string, options: {
                 whatsappMessage['buttons'] = buttons;
                 whatsappMessage['headerType'] = 1;
             }
-            await socket.sendMessage(whatsappId, whatsappMessage);
+            await socket.sendMessage(await resolveLidRecipient(socket, whatsappId), whatsappMessage);
             signale.success('Done');
             await terminate(socket, 3);
         }
@@ -54,7 +55,7 @@ export async function sendImage(recipient: string, path: string, options: { capt
         if (connection === 'open') {
             const whatsappId = await getWhatsAppId(socket, recipient);
             signale.await(`Sending image file: "${path}" to: ${whatsappId}`);
-            await sendImageHelper(socket, whatsappId, path, options);
+            await sendImageHelper(socket, await resolveLidRecipient(socket, whatsappId), path, options);
         }
     });
 }
@@ -71,7 +72,7 @@ export async function sendFile(recipient: string, path: string, options: {
         if (connection === 'open') {
             const whatsappId = await getWhatsAppId(socket, recipient);
             signale.await(`Sending file: "${path}" to: ${whatsappId}`);
-            await sendFileHelper(socket, whatsappId, path, options);
+            await sendFileHelper(socket, await resolveLidRecipient(socket, whatsappId), path, options);
         }
     });
 }
@@ -85,7 +86,7 @@ export async function sendLocation(recipient: string, latitude: string, longitud
             if (connection === 'open') {
                 const whatsappId = await getWhatsAppId(socket, recipient);
                 signale.await(`Sending location: ${geolocation[0]}, ${geolocation[1]} to: ${whatsappId}`);
-                await socket.sendMessage(whatsappId, {
+                await socket.sendMessage(await resolveLidRecipient(socket, whatsappId), {
                     location: {
                         degreesLatitude: geolocation[0],
                         degreesLongitude: geolocation[1]
@@ -117,7 +118,7 @@ export async function sendPoll(recipient: string, name: string, options: {
             if (connection === 'open') {
                 const whatsappId = await getWhatsAppId(socket, recipient);
                 signale.await(`Sending poll: "${name}" to: ${whatsappId}`);
-                await socket.sendMessage(whatsappId, {
+                await socket.sendMessage(await resolveLidRecipient(socket, whatsappId), {
                     poll: {
                         name: name,
                         selectableCount: options.selectable,

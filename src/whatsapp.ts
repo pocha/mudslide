@@ -214,6 +214,18 @@ export async function getWhatsAppId(socket: any, recipient: string) {
     return `${recipient}@s.whatsapp.net`;
 }
 
+export async function resolveLidRecipient(socket: any, whatsappId: string): Promise<string> {
+    if (!whatsappId.endsWith('@s.whatsapp.net')) {
+        return whatsappId;
+    }
+    try {
+        const results = await socket.onWhatsApp(whatsappId);
+        return results?.[0]?.lid || whatsappId;
+    } catch {
+        return whatsappId;
+    }
+}
+
 export async function sendImageHelper(socket: any, whatsappId: string, filePath: string, options: {
     caption: string | undefined
 }) {
