@@ -8,6 +8,7 @@ import {
     initWASocket,
     isLoggedOutDisconnect,
     parseGeoLocation,
+    resolveLidRecipient,
     SendChecksOptions,
     sendFileHelper,
     sendImageHelper,
@@ -40,7 +41,7 @@ export async function sendMessage(recipient: string, message: string, options: {
                 whatsappMessage['buttons'] = buttons;
                 whatsappMessage['headerType'] = 1;
             }
-            await sendPayload(socket, whatsappId, whatsappMessage, options);
+            await sendPayload(socket, await resolveLidRecipient(socket, whatsappId), whatsappMessage, options);
         }
     });
 }
@@ -85,7 +86,7 @@ export async function sendLocation(recipient: string, latitude: string, longitud
             if (connection === 'open') {
                 const whatsappId = await getWhatsAppId(socket, recipient);
                 signale.await(`Sending location: ${geolocation[0]}, ${geolocation[1]} to: ${whatsappId}`);
-                await socket.sendMessage(whatsappId, {
+                await socket.sendMessage(await resolveLidRecipient(socket, whatsappId), {
                     location: {
                         degreesLatitude: geolocation[0],
                         degreesLongitude: geolocation[1]
@@ -117,7 +118,7 @@ export async function sendPoll(recipient: string, name: string, options: {
             if (connection === 'open') {
                 const whatsappId = await getWhatsAppId(socket, recipient);
                 signale.await(`Sending poll: "${name}" to: ${whatsappId}`);
-                await socket.sendMessage(whatsappId, {
+                await socket.sendMessage(await resolveLidRecipient(socket, whatsappId), {
                     poll: {
                         name: name,
                         selectableCount: options.selectable,
