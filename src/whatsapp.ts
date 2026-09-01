@@ -10,7 +10,7 @@ import {readPhoneNumber} from "./utils";
 import * as QRCode from 'qrcode-terminal';
 
 export const globalOptions = {
-    logLevel: 'silent',
+    logLevel: 'trace',
     connectTimeoutMs: 3_000,
     defaultQueryTimeoutMs: 6_000
 }
@@ -269,6 +269,7 @@ export async function sendPayload(socket: any, whatsappId: string, payload: any,
         await simulateTyping(socket, whatsappId, options.typing);
     }
     const result = await socket.sendMessage(whatsappId, payload);
+    signale.log('DEBUG sendPayload result', JSON.stringify({whatsappId, result}));
     signale.success('Done');
     if (options.waitAck) {
         const delivered = await waitForDeliveryAck(socket, result.key, options.waitAck);
