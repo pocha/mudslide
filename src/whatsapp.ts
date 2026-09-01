@@ -1,14 +1,4 @@
-import makeWASocket, {
-    delay,
-    DisconnectReason,
-    fetchLatestWaWebVersion,
-    jidDecode,
-    jidEncode,
-    jidNormalizedUser,
-    useMultiFileAuthState,
-    WAMessageStatus,
-    WASocket
-} from "baileys";
+import makeWASocket, {delay, DisconnectReason, fetchLatestWaWebVersion, useMultiFileAuthState, WAMessageStatus, WASocket} from "baileys";
 import pino from "pino";
 import path from "path";
 import * as fs from "fs";
@@ -264,23 +254,6 @@ export async function waitForDeliveryAck(socket: any, key: any, timeoutMs: numbe
         }, timeoutMs);
         socket.ev.on('messages.update', onUpdate);
     });
-}
-
-export async function resyncSessionsFor(socket: any, whatsappId: string) {
-    const meId = socket.user?.id;
-    const meUser = jidDecode(meId)?.user;
-    const recipientUser = jidDecode(whatsappId)?.user;
-
-    const bareJids = [jidNormalizedUser(whatsappId)];
-    if (recipientUser !== meUser) {
-        bareJids.push(jidNormalizedUser(meId));
-    }
-
-    const devices = await socket.getUSyncDevices([meId, whatsappId], false, true);
-    const deviceJids = devices.map(({user, device}: { user: string, device?: number }) =>
-        jidEncode(user, 's.whatsapp.net', device));
-
-    await socket.assertSessions([...bareJids, ...deviceJids], true);
 }
 
 export async function sendPayload(socket: any, whatsappId: string, payload: any, options: SendChecksOptions = {}) {

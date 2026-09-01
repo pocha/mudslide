@@ -99,8 +99,7 @@ function addSendChecksOptions(command: Command) {
 function configureSendCommands() {
     addSendChecksOptions(program
         .command('send <recipient> <message>')
-        .description('Send message')
-        .option('--force-resync', 'Force-rebuild Signal sessions with the recipient and your own devices before sending'))
+        .description('Send message'))
         .action((recipient, message, options) => sendMessage(recipient, message, options));
 
     addSendChecksOptions(program
