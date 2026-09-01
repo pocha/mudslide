@@ -198,6 +198,19 @@ export async function logout() {
     process.on('exit', clearCacheFolder);
 }
 
+export function onConnectionOpen(socket: any, onOpen: () => Promise<void>) {
+    socket.ev.on('connection.update', async (update: any) => {
+        const {connection, lastDisconnect} = update;
+        if (connection === 'open') {
+            await onOpen();
+        } else if (connection === 'close') {
+            signale.error(isLoggedOutDisconnect(lastDisconnect) ? 'Device unlinked from WhatsApp' : 'Connection closed unexpectedly');
+            socket.end(undefined);
+            process.exit(1);
+        }
+    });
+}
+
 export async function getWhatsAppId(socket: any, recipient: string) {
     if (recipient.startsWith('+')) {
         recipient = recipient.substring(1);
