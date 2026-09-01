@@ -8,6 +8,7 @@ import {
     initWASocket,
     isLoggedOutDisconnect,
     parseGeoLocation,
+    resyncSessionsFor,
     SendChecksOptions,
     sendFileHelper,
     sendImageHelper,
@@ -17,7 +18,8 @@ import {
 
 export async function sendMessage(recipient: string, message: string, options: {
     footer: string | undefined,
-    button: Array<string>
+    button: Array<string>,
+    forceResync: boolean | undefined
 } & SendChecksOptions) {
     checkLoggedIn();
     const socket = await initWASocket();
@@ -25,6 +27,10 @@ export async function sendMessage(recipient: string, message: string, options: {
         const {connection} = update
         if (connection === 'open') {
             const whatsappId = await getWhatsAppId(socket, recipient);
+            if (options.forceResync) {
+                signale.await(`Forcing session resync with: ${whatsappId}`);
+                await resyncSessionsFor(socket, whatsappId);
+            }
             signale.await(`Sending message: "${message}" to: ${whatsappId}`);
             const buttons = options.button ? options.button.map((b, idx) => ({
                 buttonId: `id${idx}`,
