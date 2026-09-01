@@ -58,6 +58,9 @@ program.addOption(new Option('--connect-timeout <ms>', 'Connection timeout').arg
 program.on('option:connect-timeout', (ms) => globalOptions.connectTimeoutMs = parseInt(ms, 10));
 program.addOption(new Option('--query-timeout <ms>', 'Query timeout').argParser(v => parseInt(v, 10)));
 program.on('option:query-timeout', (ms) => globalOptions.defaultQueryTimeoutMs = parseInt(ms, 10));
+program.addOption(new Option('--log-level <level>', 'Set log level directly')
+    .choices(['silent', 'fatal', 'error', 'warn', 'info', 'debug', 'trace']));
+program.on('option:log-level', (level) => globalOptions.logLevel = level);
 program.addOption(new Option('--timeout <sec>', 'Command timeout').default(60).argParser(parseInt));
 
 program.hook('preAction', (command: Command) => {
