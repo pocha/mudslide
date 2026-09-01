@@ -1,4 +1,13 @@
-import makeWASocket, {delay, DisconnectReason, fetchLatestWaWebVersion, useMultiFileAuthState, WASocket} from "baileys";
+import makeWASocket, {
+    delay,
+    DisconnectReason,
+    fetchLatestWaWebVersion,
+    jidDecode,
+    jidEncode,
+    jidNormalizedUser,
+    useMultiFileAuthState,
+    WASocket
+} from "baileys";
 import pino from "pino";
 import path from "path";
 import * as fs from "fs";
@@ -212,6 +221,23 @@ export async function getWhatsAppId(socket: any, recipient: string) {
         }
     }
     return `${recipient}@s.whatsapp.net`;
+}
+
+export async function resyncSessionsFor(socket: any, whatsappId: string) {
+    const meId = socket.user?.id;
+    const meUser = jidDecode(meId)?.user;
+    const recipientUser = jidDecode(whatsappId)?.user;
+
+    const bareJids = [jidNormalizedUser(whatsappId)];
+    if (recipientUser !== meUser) {
+        bareJids.push(jidNormalizedUser(meId));
+    }
+
+    const devices = await socket.getUSyncDevices([meId, whatsappId], false, true);
+    const deviceJids = devices.map(({user, device}: { user: string, device?: number }) =>
+        jidEncode(user, 's.whatsapp.net', device));
+
+    await socket.assertSessions([...bareJids, ...deviceJids], true);
 }
 
 export async function sendImageHelper(socket: any, whatsappId: string, filePath: string, options: {

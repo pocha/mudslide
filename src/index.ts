@@ -75,6 +75,7 @@ function configureSendCommands() {
     program
         .command('send <recipient> <message>')
         .description('Send message')
+        .option('--force-resync', 'Force-rebuild Signal sessions with the recipient and your own devices before sending')
         .action((recipient, message, options) => sendMessage(recipient, message, options));
 
     program
