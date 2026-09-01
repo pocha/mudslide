@@ -227,18 +227,6 @@ export async function checkNumberExistsOnWhatsApp(socket: any, whatsappId: strin
     return !!result?.[0]?.exists;
 }
 
-export async function resolveLidRecipient(socket: any, whatsappId: string): Promise<string> {
-    if (!whatsappId.endsWith('@s.whatsapp.net')) {
-        return whatsappId;
-    }
-    try {
-        const results = await socket.onWhatsApp(whatsappId);
-        return results?.[0]?.lid || whatsappId;
-    } catch {
-        return whatsappId;
-    }
-}
-
 export async function simulateTyping(socket: any, whatsappId: string, ms: number) {
     await socket.sendPresenceUpdate('composing', whatsappId);
     await delay(ms);
@@ -269,7 +257,6 @@ export async function waitForDeliveryAck(socket: any, key: any, timeoutMs: numbe
 }
 
 export async function sendPayload(socket: any, whatsappId: string, payload: any, options: SendChecksOptions = {}) {
-    whatsappId = await resolveLidRecipient(socket, whatsappId);
     if (options.liveCheck) {
         const exists = await checkNumberExistsOnWhatsApp(socket, whatsappId);
         if (!exists) {
