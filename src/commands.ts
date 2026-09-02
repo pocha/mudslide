@@ -4,9 +4,11 @@ import {
     checkValidFile,
     getAuthStateCacheFolderLocation,
     getWhatsAppId,
+    globalOptions,
     handleNewlines,
     initWASocket,
     onConnectionOpen,
+    prepareSend,
     parseGeoLocation,
     sendFileHelper,
     sendImageHelper,
@@ -20,7 +22,8 @@ export async function sendMessage(recipient: string, message: string, options: {
     button: Array<string>
 } & GeneralSendOptions) {
     checkLoggedIn();
-    const socket = await initWASocket();
+    const text = handleNewlines(message);
+    const socket = await initWASocket(text);
     onConnectionOpen(socket, async () => {
         const whatsappId = await getWhatsAppId(socket, recipient);
         signale.await(`Sending message: "${message}" to: ${whatsappId}`);
@@ -30,7 +33,7 @@ export async function sendMessage(recipient: string, message: string, options: {
             type: 1
         })) : [];
         const whatsappMessage: any = {};
-        whatsappMessage['text'] = handleNewlines(message);
+        whatsappMessage['text'] = text;
         if (options.footer) {
             whatsappMessage['footer'] = options.footer;
         }
@@ -38,7 +41,10 @@ export async function sendMessage(recipient: string, message: string, options: {
             whatsappMessage['buttons'] = buttons;
             whatsappMessage['headerType'] = 1;
         }
-        await sendSocketMessage(socket, whatsappId, whatsappMessage, options);
+        await prepareSend(socket, whatsappId, options);
+        await socket.sendMessage(whatsappId, whatsappMessage);
+        signale.success('Done');
+        await terminate(socket, globalOptions.waitAfterSendSeconds);
     });
 }
 

@@ -48,6 +48,9 @@ program.addOption(
 program.on('option:connect-timeout', (ms) => globalOptions.connectTimeoutMs = parseInt(ms, 10));
 program.addOption(new Option('--query-timeout <ms>', 'Query timeout').default(6_000).argParser(v => parseInt(v, 10)));
 program.on('option:query-timeout', (ms) => globalOptions.defaultQueryTimeoutMs = parseInt(ms, 10));
+program.addOption(new Option('--wait-after-send <sec>', 'Seconds to stay connected after sending, to answer retry requests')
+    .default(3).argParser(parseInt));
+program.on('option:wait-after-send', (sec) => globalOptions.waitAfterSendSeconds = parseInt(sec, 10));
 program.addOption(new Option('--timeout <sec>', 'Command timeout').default(60).argParser(parseInt));
 
 program.hook('preAction', (command: Command) => {

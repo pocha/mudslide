@@ -13,7 +13,8 @@ import {GeneralSendOptions} from "./entities/GeneralSendOptions";
 export const globalOptions = {
     logLevel: 'silent',
     connectTimeoutMs: 3_000,
-    defaultQueryTimeoutMs: 6_000
+    defaultQueryTimeoutMs: 6_000,
+    waitAfterSendSeconds: 3
 }
 
 export const mudslideFooter = '\u2B50 Please star Mudslide on GitHub! https://github.com/robvanderleek/mudslide';
@@ -243,8 +244,7 @@ export async function simulateTyping(socket: any, whatsappId: string, ms: number
     await socket.sendPresenceUpdate('paused', whatsappId);
 }
 
-export async function sendSocketMessage(socket: any, whatsappId: string, payload: any,
-                                        options: GeneralSendOptions = {}) {
+export async function prepareSend(socket: any, whatsappId: string, options: GeneralSendOptions = {}) {
     if (options.liveCheck) {
         const exists = await checkNumberExistsOnWhatsApp(socket, whatsappId);
         if (!exists) {
@@ -256,6 +256,11 @@ export async function sendSocketMessage(socket: any, whatsappId: string, payload
     if (options.typing) {
         await simulateTyping(socket, whatsappId, options.typing);
     }
+}
+
+export async function sendSocketMessage(socket: any, whatsappId: string, payload: any,
+                                        options: GeneralSendOptions = {}) {
+    await prepareSend(socket, whatsappId, options);
     await socket.sendMessage(whatsappId, payload);
     signale.success('Done');
     await terminate(socket, 3);
