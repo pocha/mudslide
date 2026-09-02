@@ -14,7 +14,7 @@ export const globalOptions = {
     logLevel: 'trace',
     connectTimeoutMs: 3_000,
     defaultQueryTimeoutMs: 6_000,
-    waitAfterSendSeconds: 3
+    waitAfterSendSeconds: 15
 }
 
 export const mudslideFooter = '\u2B50 Please star Mudslide on GitHub! https://github.com/robvanderleek/mudslide';

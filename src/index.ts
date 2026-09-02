@@ -63,7 +63,7 @@ program.addOption(new Option('--log-level <level>', 'Set log level directly')
     .choices(['silent', 'fatal', 'error', 'warn', 'info', 'debug', 'trace']));
 program.on('option:log-level', (level) => globalOptions.logLevel = level);
 program.addOption(new Option('--wait-after-send <sec>', 'Seconds to stay connected after sending, to answer retry requests')
-    .default(3).argParser(parseInt));
+    .default(15).argParser(parseInt));
 program.on('option:wait-after-send', (sec) => globalOptions.waitAfterSendSeconds = parseInt(sec, 10));
 program.addOption(new Option('--timeout <sec>', 'Command timeout').default(60).argParser(parseInt));
 
