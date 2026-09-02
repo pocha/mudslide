@@ -54,13 +54,17 @@ program.on('option:proxy', () => {
     // @ts-ignore
     global.GLOBAL_AGENT.HTTPS_PROXY = process.env.HTTPS_PROXY;
 });
-program.addOption(new Option('--connect-timeout <ms>', 'Connection timeout').argParser(v => parseInt(v, 10)));
+program.addOption(
+    new Option('--connect-timeout <ms>', 'Connection timeout').default(3_000).argParser(v => parseInt(v, 10)));
 program.on('option:connect-timeout', (ms) => globalOptions.connectTimeoutMs = parseInt(ms, 10));
-program.addOption(new Option('--query-timeout <ms>', 'Query timeout').argParser(v => parseInt(v, 10)));
+program.addOption(new Option('--query-timeout <ms>', 'Query timeout').default(6_000).argParser(v => parseInt(v, 10)));
 program.on('option:query-timeout', (ms) => globalOptions.defaultQueryTimeoutMs = parseInt(ms, 10));
 program.addOption(new Option('--log-level <level>', 'Set log level directly')
     .choices(['silent', 'fatal', 'error', 'warn', 'info', 'debug', 'trace']));
 program.on('option:log-level', (level) => globalOptions.logLevel = level);
+program.addOption(new Option('--wait-after-send <sec>', 'Seconds to stay connected after sending, to answer retry requests')
+    .default(3).argParser(parseInt));
+program.on('option:wait-after-send', (sec) => globalOptions.waitAfterSendSeconds = parseInt(sec, 10));
 program.addOption(new Option('--timeout <sec>', 'Command timeout').default(60).argParser(parseInt));
 
 program.hook('preAction', (command: Command) => {
@@ -89,26 +93,25 @@ function configureBasicCommands() {
         .action(() => me());
 }
 
-function addSendChecksOptions(command: Command) {
+function addGeneralSendOptions(command: Command) {
     return command
         .option('--live-check', 'Verify the recipient exists on WhatsApp before sending')
-        .option('--typing <ms>', 'Simulate typing indicator for the given duration (ms) before sending', parseInt)
-        .option('--wait-ack <ms>', 'Wait for delivery acknowledgement after sending, up to the given timeout (ms)', parseInt);
+        .option('--typing <ms>', 'Simulate typing indicator for the given duration (ms) before sending', parseInt);
 }
 
 function configureSendCommands() {
-    addSendChecksOptions(program
+    addGeneralSendOptions(program
         .command('send <recipient> <message>')
         .description('Send message'))
         .action((recipient, message, options) => sendMessage(recipient, message, options));
 
-    addSendChecksOptions(program
+    addGeneralSendOptions(program
         .command('send-image <recipient> <file>')
         .option('--caption <text>', 'Caption text')
         .description('Send image file'))
         .action((recipient, file, options) => sendImage(recipient, file, options));
 
-    addSendChecksOptions(program
+    addGeneralSendOptions(program
         .command('send-file <recipient> <file>')
         .option('--caption <text>', 'Caption text')
         .option('--type <document|audio|video>', 'File type', 'document')
