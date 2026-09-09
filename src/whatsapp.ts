@@ -1,4 +1,4 @@
-import makeWASocket, {delay, DisconnectReason, fetchLatestWaWebVersion, useMultiFileAuthState, WAMessageStatus, WASocket} from "baileys";
+import makeWASocket, {delay, DisconnectReason, fetchLatestWaWebVersion, useMultiFileAuthState, WASocket} from "baileys";
 import pino from "pino";
 import path from "path";
 import * as fs from "fs";
@@ -8,11 +8,13 @@ import * as os from "os";
 import mime from 'mime';
 import {readPhoneNumber} from "./utils";
 import * as QRCode from 'qrcode-terminal';
+import {GeneralSendOptions} from "./entities/GeneralSendOptions";
 
 export const globalOptions = {
     logLevel: 'trace',
     connectTimeoutMs: 3_000,
-    defaultQueryTimeoutMs: 6_000
+    defaultQueryTimeoutMs: 6_000,
+    waitAfterSendSeconds: 15
 }
 
 export const mudslideFooter = '\u2B50 Please star Mudslide on GitHub! https://github.com/robvanderleek/mudslide';
@@ -231,12 +233,6 @@ export async function getWhatsAppId(socket: any, recipient: string) {
     return `${recipient}@s.whatsapp.net`;
 }
 
-export type SendChecksOptions = {
-    liveCheck?: boolean,
-    typing?: number,
-    waitAck?: number
-}
-
 export async function checkNumberExistsOnWhatsApp(socket: any, whatsappId: string): Promise<boolean> {
     const result = await socket.onWhatsApp(whatsappId);
     return !!result?.[0]?.exists;
@@ -248,30 +244,7 @@ export async function simulateTyping(socket: any, whatsappId: string, ms: number
     await socket.sendPresenceUpdate('paused', whatsappId);
 }
 
-export async function waitForDeliveryAck(socket: any, key: any, timeoutMs: number): Promise<boolean> {
-    return new Promise(resolve => {
-        const cleanup = () => {
-            clearTimeout(timer);
-            socket.ev.off('messages.update', onUpdate);
-        };
-        const onUpdate = (updates: any[]) => {
-            for (const {key: updateKey, update} of updates) {
-                if (updateKey.id === key.id && update.status >= WAMessageStatus.DELIVERY_ACK) {
-                    cleanup();
-                    resolve(true);
-                    return;
-                }
-            }
-        };
-        const timer = setTimeout(() => {
-            cleanup();
-            resolve(false);
-        }, timeoutMs);
-        socket.ev.on('messages.update', onUpdate);
-    });
-}
-
-export async function sendPayload(socket: any, whatsappId: string, payload: any, options: SendChecksOptions = {}) {
+export async function prepareSend(socket: any, whatsappId: string, options: GeneralSendOptions = {}) {
     if (options.liveCheck) {
         const exists = await checkNumberExistsOnWhatsApp(socket, whatsappId);
         if (!exists) {
@@ -283,29 +256,28 @@ export async function sendPayload(socket: any, whatsappId: string, payload: any,
     if (options.typing) {
         await simulateTyping(socket, whatsappId, options.typing);
     }
-    const result = await socket.sendMessage(whatsappId, payload);
-    signale.log('DEBUG sendPayload result', JSON.stringify({whatsappId, result}));
+}
+
+export async function sendSocketMessage(socket: any, whatsappId: string, payload: any,
+                                        options: GeneralSendOptions = {}) {
+    await prepareSend(socket, whatsappId, options);
+    await socket.sendMessage(whatsappId, payload);
     signale.success('Done');
-    if (options.waitAck) {
-        const delivered = await waitForDeliveryAck(socket, result.key, options.waitAck);
-        if (delivered) {
-            signale.success('Delivered');
-        } else {
-            signale.error(`No delivery acknowledgement within ${options.waitAck}ms`);
-        }
-    }
     await terminate(socket, 3);
 }
 
 export async function sendImageHelper(socket: any, whatsappId: string, filePath: string, options: {
     caption: string | undefined
-} & SendChecksOptions) {
+} & GeneralSendOptions) {
     const payload = {image: fs.readFileSync(filePath), caption: handleNewlines(options.caption)}
-    await sendPayload(socket, whatsappId, payload, options);
+    await sendSocketMessage(socket, whatsappId, payload, options);
 }
 
 export async function sendFileHelper(socket: any, whatsappId: string, filePath: string,
-                                     options: { caption: string | undefined, type: 'audio' | 'video' | 'document' } & SendChecksOptions) {
+                                     options: {
+                                         caption: string | undefined,
+                                         type: 'audio' | 'video' | 'document'
+                                     } & GeneralSendOptions) {
     const payload: any = {
         mimetype: mime.getType(filePath),
         caption: handleNewlines(options.caption)
@@ -321,7 +293,7 @@ export async function sendFileHelper(socket: any, whatsappId: string, filePath: 
             payload['document'] = fs.readFileSync(filePath);
             payload['fileName'] = path.basename(filePath)
     }
-    await sendPayload(socket, whatsappId, payload, options);
+    await sendSocketMessage(socket, whatsappId, payload, options);
 }
 
 export function handleNewlines(s?: string): string | undefined {
