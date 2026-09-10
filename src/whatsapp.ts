@@ -1,4 +1,4 @@
-import makeWASocket, {delay, DisconnectReason, fetchLatestWaWebVersion, useMultiFileAuthState, WAMessageStatus, WASocket} from "baileys";
+import makeWASocket, {areJidsSameUser, delay, DisconnectReason, fetchLatestWaWebVersion, isJidGroup, useMultiFileAuthState, WAMessageStatus, WASocket} from "baileys";
 import pino from "pino";
 import path from "path";
 import * as fs from "fs";
@@ -64,6 +64,54 @@ export async function initWASocket(message?: string): Promise<WASocket> {
     });
     socket.ev.on('creds.update', async () => await saveCreds());
     return socket;
+}
+
+// A session can sit forever with libsignal's `pendingPreKey` still set if the recipient
+// never confirms the handshake (haveOpenSession() treats it as valid regardless — see
+// libsignal's session_record.js). When that happens for a group participant, our
+// SenderKeyDistributionMessage never actually lands on their device, so every message
+// we send afterwards keeps showing "Waiting for this message" with no way to self-heal
+// (no retry-receipt is ever generated, since the recipient never got anything to reject).
+// This checks each participant's cached session for that stuck state before we send, and
+// forces a fresh handshake (assertSessions force=true — a real prekey re-fetch + rekey,
+// same as a brand new contact) for anyone found stuck, so *this* send has a chance to work.
+export async function forceRekeyIfSessionUnconfirmed(socket: any, jids: string[]) {
+    const staleJids: string[] = [];
+    for (const jid of jids) {
+        try {
+            const addr = socket.signalRepository.jidToSignalProtocolAddress(jid);
+            const {[addr]: record} = await socket.authState.keys.get('session', [addr]);
+            const sessions = record?._sessions ? Object.values(record._sessions) : [];
+            const hasUnconfirmedPreKey = sessions.some((s: any) => !!s?.pendingPreKey);
+            signale.log(`Session check for ${jid} (addr ${addr}): ${
+                !record ? 'no session on file' : hasUnconfirmedPreKey ? 'UNCONFIRMED (pendingPreKey set)' : 'confirmed'
+            }`);
+            if (hasUnconfirmedPreKey) {
+                staleJids.push(jid);
+            }
+        } catch (err) {
+            signale.warn(`Could not inspect session for ${jid}, skipping stale-session check for it: ${err}`);
+        }
+    }
+    if (staleJids.length) {
+        signale.warn(`Forcing a fresh handshake (assertSessions force=true) for unconfirmed session(s): ${staleJids.join(', ')}`);
+        await socket.assertSessions(staleJids, true);
+        signale.success(`Fresh handshake complete for: ${staleJids.join(', ')}`);
+    }
+    return staleJids;
+}
+
+// Group-send entry point for the check above: resolves the group's participants and
+// runs the stale-session check/fix against all of them except ourselves.
+export async function forceRekeyStaleGroupSessions(socket: any, whatsappId: string) {
+    if (!isJidGroup(whatsappId)) {
+        return [];
+    }
+    const metadata = await socket.groupMetadata(whatsappId);
+    const participantJids = (metadata?.participants || [])
+        .map((p: any) => p.id)
+        .filter((jid: string) => !areJidsSameUser(jid, socket.user?.id));
+    return forceRekeyIfSessionUnconfirmed(socket, participantJids);
 }
 
 export async function terminate(socket: any, waitSeconds = 1) {

@@ -2,6 +2,7 @@ import signale from "signale";
 import {
     checkLoggedIn,
     checkValidFile,
+    forceRekeyStaleGroupSessions,
     getAuthStateCacheFolderLocation,
     getWhatsAppId,
     handleNewlines,
@@ -23,6 +24,11 @@ export async function sendMessage(recipient: string, message: string, options: {
     const socket = await initWASocket();
     onConnectionOpen(socket, async () => {
         const whatsappId = await getWhatsAppId(socket, recipient);
+        // Group participants can be left with a session Baileys thinks is fine but that
+        // was never actually confirmed by the recipient's device (see forceRekeyStaleGroupSessions
+        // in whatsapp.ts) — every message sent over a session like that silently shows as
+        // "Waiting for this message" on their end. Catch and fix that before we send.
+        await forceRekeyStaleGroupSessions(socket, whatsappId);
         signale.await(`Sending message: "${message}" to: ${whatsappId}`);
         const buttons = options.button ? options.button.map((b, idx) => ({
             buttonId: `id${idx}`,
