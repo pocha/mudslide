@@ -20,7 +20,9 @@ export async function sendMessage(recipient: string, message: string, options: {
     button: Array<string>
 } & SendChecksOptions) {
     checkLoggedIn();
-    const socket = await initWASocket();
+    // Pass the real message text through so getMessage() (whatsapp.ts) can hand it back
+    // to Baileys if a retry-receipt forces a resend — see the watobot handshake test.
+    const socket = await initWASocket(message);
     onConnectionOpen(socket, async () => {
         const whatsappId = await getWhatsAppId(socket, recipient);
         signale.await(`Sending message: "${message}" to: ${whatsappId}`);

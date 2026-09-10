@@ -56,7 +56,14 @@ export async function initWASocket(message?: string): Promise<WASocket> {
         browser: [os, 'Chrome', '10.15.0'],
         version: version,
         syncFullHistory: false,
-        getMessage: async _ => {
+        getMessage: async (key) => {
+            // Baileys calls this when it needs to resend a message after a retry-receipt
+            // (stale/failed session on the recipient's end) — without real content here,
+            // the resend goes out empty. `message` is only ever set for the sendMessage
+            // command (see commands.ts) — other commands still get the old undefined behavior.
+            signale.log(`getMessage called for retry of msg id=${key?.id}`, message !== undefined
+                ? `— returning cached text: "${message}"`
+                : '— no message text was passed to initWASocket(), returning empty conversation');
             return {
                 conversation: message
             }
@@ -68,9 +75,10 @@ export async function initWASocket(message?: string): Promise<WASocket> {
 
 export async function terminate(socket: any, waitSeconds = 1) {
     if (waitSeconds > 0) {
-        signale.await(`Closing WA connection, waiting for ${waitSeconds} second(s)...`);
+        signale.await(`Closing WA connection, waiting for ${waitSeconds} second(s)... (watch above for "recv retry request" — that means the recipient couldn't decrypt and is asking us to resend)`);
     }
     await delay(waitSeconds * 1000);
+    signale.log(`Grace wait of ${waitSeconds}s complete — closing connection now.`);
     socket.end(undefined);
     if (socket.ws && socket.ws.isOpen) {
         await socket.ws.close();
@@ -294,7 +302,10 @@ export async function sendPayload(socket: any, whatsappId: string, payload: any,
             signale.error(`No delivery acknowledgement within ${options.waitAck}ms`);
         }
     }
-    await terminate(socket, 3);
+    // Hardcoded to 15s (up from 3s) for the watobot handshake test: gives a WhatsApp
+    // retry-receipt (sent by the recipient when it can't decrypt) a real chance to
+    // arrive before we close the socket, so Baileys' built-in sendMessagesAgain can fire.
+    await terminate(socket, 15);
 }
 
 export async function sendImageHelper(socket: any, whatsappId: string, filePath: string, options: {
