@@ -1,4 +1,4 @@
-import makeWASocket, {areJidsSameUser, delay, DisconnectReason, fetchLatestWaWebVersion, isJidGroup, useMultiFileAuthState, WAMessageStatus, WASocket} from "baileys";
+import makeWASocket, {areJidsSameUser, delay, DisconnectReason, fetchLatestWaWebVersion, isJidGroup, jidEncode, useMultiFileAuthState, WAMessageStatus, WASocket} from "baileys";
 import pino from "pino";
 import path from "path";
 import * as fs from "fs";
@@ -86,9 +86,18 @@ export async function forceRekeyIfSessionUnconfirmed(socket: any, groupJid: stri
     }
     // Group fanout happens per-device (e.g. 5007965425843:35@lid), not per-participant — this
     // is the same lookup Baileys itself uses to decide who needs the SenderKeyDistributionMessage.
-    const devices: Array<{ jid: string }> = await socket.getUSyncDevices(participantJids, false, false);
+    const devices: Array<{ jid?: string, user?: string, server?: string, device?: number }> = await socket.getUSyncDevices(participantJids, false, false);
+    signale.log(`getUSyncDevices(${JSON.stringify(participantJids)}) raw result: ${JSON.stringify(devices)}`);
     const staleDeviceJids: string[] = [];
-    for (const {jid: deviceJid} of devices) {
+    for (const entry of devices) {
+        // .jid isn't reliably populated for this account's LID-migrated devices (seen empty in
+        // production) — fall back to building it from .user/.server/.device, which getUSyncDevices
+        // always sets regardless of which internal path (cache/explicit/USync-fetch) produced it.
+        const deviceJid = entry.jid || (entry.user && entry.server ? jidEncode(entry.user, entry.server as any, entry.device) : undefined);
+        if (!deviceJid) {
+            signale.warn(`Could not resolve a JID for device entry, skipping: ${JSON.stringify(entry)}`);
+            continue;
+        }
         try {
             const addr = socket.signalRepository.jidToSignalProtocolAddress(deviceJid);
             const {[addr]: record} = await socket.authState.keys.get('session', [addr]);
