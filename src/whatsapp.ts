@@ -1,4 +1,4 @@
-import makeWASocket, {delay, DisconnectReason, fetchLatestWaWebVersion, useMultiFileAuthState, WAMessageStatus, WASocket} from "baileys";
+import makeWASocket, {areJidsSameUser, delay, DisconnectReason, fetchLatestWaWebVersion, isJidGroup, useMultiFileAuthState, WAMessageStatus, WASocket} from "baileys";
 import pino from "pino";
 import path from "path";
 import * as fs from "fs";
@@ -64,6 +64,71 @@ export async function initWASocket(message?: string): Promise<WASocket> {
     });
     socket.ev.on('creds.update', async () => await saveCreds());
     return socket;
+}
+
+// A pairwise session can sit forever with libsignal's `pendingPreKey` still set if the
+// recipient device never confirms the handshake (haveOpenSession() treats it as valid
+// regardless — see libsignal's session_record.js). Worse, Baileys' own group-send fanout
+// (messages-send.js) decides whether to (re)send a device the group's SenderKeyDistribution
+// Message purely from a *separate* `sender-key-memory` flag ("have I already sent this
+// device the key"), not from whether the underlying session actually succeeded — so once
+// that flag is set true (e.g. from an attempt whose session never got confirmed), Baileys
+// will keep skipping that device forever, even on a fully fresh session. Both pieces of
+// state have to be cleared together for a stuck device to actually get re-keyed:
+//  1. The dead session itself, via signalRepository.deleteSession — so Baileys' own (non-
+//     forced) assertSessions() call during the next send fetches a real fresh prekey bundle
+//     instead of reusing session state that was never confirmed.
+//  2. This group's sender-key-memory entry for that device — otherwise Baileys believes the
+//     key was already delivered and never re-sends it, no matter how fresh the session is.
+export async function forceRekeyIfSessionUnconfirmed(socket: any, groupJid: string, participantJids: string[]) {
+    if (!participantJids.length) {
+        return [];
+    }
+    // Group fanout happens per-device (e.g. 5007965425843:35@lid), not per-participant — this
+    // is the same lookup Baileys itself uses to decide who needs the SenderKeyDistributionMessage.
+    const devices: Array<{ jid: string }> = await socket.getUSyncDevices(participantJids, false, false);
+    const staleDeviceJids: string[] = [];
+    for (const {jid: deviceJid} of devices) {
+        try {
+            const addr = socket.signalRepository.jidToSignalProtocolAddress(deviceJid);
+            const {[addr]: record} = await socket.authState.keys.get('session', [addr]);
+            const sessions = record?._sessions ? Object.values(record._sessions) : [];
+            const hasUnconfirmedPreKey = sessions.some((s: any) => !!s?.pendingPreKey);
+            signale.log(`Session check for ${deviceJid} (addr ${addr}): ${
+                !record ? 'no session on file' : hasUnconfirmedPreKey ? 'UNCONFIRMED (pendingPreKey set)' : 'confirmed'
+            }`);
+            if (hasUnconfirmedPreKey) {
+                staleDeviceJids.push(deviceJid);
+            }
+        } catch (err) {
+            signale.warn(`Could not inspect session for ${deviceJid}, skipping stale-session check for it: ${err}`);
+        }
+    }
+    if (staleDeviceJids.length) {
+        signale.warn(`Unconfirmed session(s) found — clearing dead session + sender-key-memory flag so Baileys re-delivers the group key to: ${staleDeviceJids.join(', ')}`);
+        await socket.signalRepository.deleteSession(staleDeviceJids);
+        const {[groupJid]: existingSenderKeyMap} = await socket.authState.keys.get('sender-key-memory', [groupJid]);
+        const updatedSenderKeyMap = {...(existingSenderKeyMap || {})};
+        for (const deviceJid of staleDeviceJids) {
+            delete updatedSenderKeyMap[deviceJid];
+        }
+        await socket.authState.keys.set({'sender-key-memory': {[groupJid]: updatedSenderKeyMap}});
+        signale.success(`Cleared stale session + sender-key-memory state for: ${staleDeviceJids.join(', ')} — this send should now re-deliver the group key.`);
+    }
+    return staleDeviceJids;
+}
+
+// Group-send entry point for the check above: resolves the group's participants and
+// runs the stale-session check/fix against all of their devices except our own.
+export async function forceRekeyStaleGroupSessions(socket: any, whatsappId: string) {
+    if (!isJidGroup(whatsappId)) {
+        return [];
+    }
+    const metadata = await socket.groupMetadata(whatsappId);
+    const participantJids = (metadata?.participants || [])
+        .map((p: any) => p.id)
+        .filter((jid: string) => !areJidsSameUser(jid, socket.user?.id));
+    return forceRekeyIfSessionUnconfirmed(socket, whatsappId, participantJids);
 }
 
 export async function terminate(socket: any, waitSeconds = 1) {

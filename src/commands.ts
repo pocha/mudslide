@@ -2,6 +2,7 @@ import signale from "signale";
 import {
     checkLoggedIn,
     checkValidFile,
+    forceRekeyStaleGroupSessions,
     getAuthStateCacheFolderLocation,
     getWhatsAppId,
     handleNewlines,
@@ -23,6 +24,10 @@ export async function sendMessage(recipient: string, message: string, options: {
     const socket = await initWASocket();
     onConnectionOpen(socket, async () => {
         const whatsappId = await getWhatsAppId(socket, recipient);
+        // A group participant device can be stuck with a dead session AND a stale
+        // sender-key-memory flag that stops Baileys from ever re-delivering the group key to
+        // it — see forceRekeyStaleGroupSessions in whatsapp.ts. Clear that before we send.
+        await forceRekeyStaleGroupSessions(socket, whatsappId);
         signale.await(`Sending message: "${message}" to: ${whatsappId}`);
         const buttons = options.button ? options.button.map((b, idx) => ({
             buttonId: `id${idx}`,
