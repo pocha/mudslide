@@ -90,10 +90,12 @@ export async function forceRekeyIfSessionUnconfirmed(socket: any, groupJid: stri
     signale.log(`getUSyncDevices(${JSON.stringify(participantJids)}) raw result: ${JSON.stringify(devices)}`);
     const staleDeviceJids: string[] = [];
     for (const entry of devices) {
-        // .jid isn't reliably populated for this account's LID-migrated devices (seen empty in
-        // production) — fall back to building it from .user/.server/.device, which getUSyncDevices
-        // always sets regardless of which internal path (cache/explicit/USync-fetch) produced it.
-        const deviceJid = entry.jid || (entry.user && entry.server ? jidEncode(entry.user, entry.server as any, entry.device) : undefined);
+        // Confirmed in production: for this account's LID-addressed devices, getUSyncDevices()
+        // returns bare {user, device} with neither .jid nor .server populated at all — Baileys
+        // 6.7.24's device-sync path for LID accounts just doesn't fill those in. Every participant
+        // we ever check here comes from a group we've observed as addressing_mode='lid' in the
+        // wire log, so defaulting the missing server to 'lid' is safe for this fix's scope.
+        const deviceJid = entry.jid || (entry.user ? jidEncode(entry.user, (entry.server as any) || 'lid', entry.device) : undefined);
         if (!deviceJid) {
             signale.warn(`Could not resolve a JID for device entry, skipping: ${JSON.stringify(entry)}`);
             continue;
