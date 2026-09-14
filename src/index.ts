@@ -161,7 +161,8 @@ function configureCommunityCommands() {
     program
         .command('communities')
         .description('List all your communities')
-        .action(() => listCommunities());
+        .option('--admin-only', 'Only list communities you administer')
+        .action((options) => listCommunities(options));
 
     program
         .command('community-info <community-id>')

@@ -5,6 +5,7 @@ import {
     getWhatsAppId,
     handleNewlines,
     isLoggedOutDisconnect,
+    isOwnParticipant,
     parseGeoLocation,
     waitForDeliveryAck
 } from "../src/whatsapp";
@@ -71,4 +72,25 @@ test('wait for delivery ack, resolves once the status update arrives', async () 
 test('detect logged-out disconnect', () => {
     expect(isLoggedOutDisconnect({error: {output: {statusCode: 401}}})).toBe(true);
     expect(isLoggedOutDisconnect({error: {output: {statusCode: 500}}})).toBe(false);
+})
+
+test('is own participant, matches on phone number', () => {
+    const socket = {user: {id: '3161234567890:1@s.whatsapp.net', lid: undefined}};
+    const participant = {attrs: {jid: '999@lid', phone_number: '3161234567890@s.whatsapp.net'}};
+
+    expect(isOwnParticipant(socket, participant)).toBe(true);
+})
+
+test('is own participant, matches on lid when phone number is missing', () => {
+    const socket = {user: {id: '3161234567890:1@s.whatsapp.net', lid: '999:1@lid'}};
+    const participant = {attrs: {jid: '999@lid'}};
+
+    expect(isOwnParticipant(socket, participant)).toBe(true);
+})
+
+test('is own participant, no match', () => {
+    const socket = {user: {id: '3161234567890:1@s.whatsapp.net', lid: '999:1@lid'}};
+    const participant = {attrs: {jid: '111@lid', phone_number: '3169999999999@s.whatsapp.net'}};
+
+    expect(isOwnParticipant(socket, participant)).toBe(false);
 })

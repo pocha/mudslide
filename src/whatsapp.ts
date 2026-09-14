@@ -1,4 +1,4 @@
-import makeWASocket, {delay, DisconnectReason, fetchLatestWaWebVersion, useMultiFileAuthState, WAMessageStatus, WASocket} from "baileys";
+import makeWASocket, {areJidsSameUser, delay, DisconnectReason, fetchLatestWaWebVersion, useMultiFileAuthState, WAMessageStatus, WASocket} from "baileys";
 import pino from "pino";
 import path from "path";
 import * as fs from "fs";
@@ -240,6 +240,11 @@ export type SendChecksOptions = {
 export async function checkNumberExistsOnWhatsApp(socket: any, whatsappId: string): Promise<boolean> {
     const result = await socket.onWhatsApp(whatsappId);
     return !!result?.[0]?.exists;
+}
+
+export function isOwnParticipant(socket: any, participant: any): boolean {
+    return (participant.attrs.phone_number && areJidsSameUser(socket.user.id, participant.attrs.phone_number)) ||
+        (socket.user.lid && areJidsSameUser(socket.user.lid, participant.attrs.jid));
 }
 
 export async function simulateTyping(socket: any, whatsappId: string, ms: number) {
