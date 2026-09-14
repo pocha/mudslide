@@ -54,9 +54,10 @@ program.on('option:proxy', () => {
     // @ts-ignore
     global.GLOBAL_AGENT.HTTPS_PROXY = process.env.HTTPS_PROXY;
 });
-program.addOption(new Option('--connect-timeout <ms>', 'Connection timeout').argParser(v => parseInt(v, 10)));
+program.addOption(
+    new Option('--connect-timeout <ms>', 'Connection timeout').default(3_000).argParser(v => parseInt(v, 10)));
 program.on('option:connect-timeout', (ms) => globalOptions.connectTimeoutMs = parseInt(ms, 10));
-program.addOption(new Option('--query-timeout <ms>', 'Query timeout').argParser(v => parseInt(v, 10)));
+program.addOption(new Option('--query-timeout <ms>', 'Query timeout').default(6_000).argParser(v => parseInt(v, 10)));
 program.on('option:query-timeout', (ms) => globalOptions.defaultQueryTimeoutMs = parseInt(ms, 10));
 program.addOption(new Option('--log-level <level>', 'Set log level directly')
     .choices(['silent', 'fatal', 'error', 'warn', 'info', 'debug', 'trace']));
