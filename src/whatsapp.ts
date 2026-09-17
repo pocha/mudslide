@@ -10,7 +10,7 @@ import {readPhoneNumber} from "./utils";
 import * as QRCode from 'qrcode-terminal';
 
 export const globalOptions = {
-    logLevel: 'trace',
+    logLevel: 'debug',
     connectTimeoutMs: 3_000,
     defaultQueryTimeoutMs: 6_000
 }
