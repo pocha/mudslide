@@ -238,6 +238,9 @@ export type SendChecksOptions = {
 }
 
 export async function checkNumberExistsOnWhatsApp(socket: any, whatsappId: string): Promise<boolean> {
+    if (whatsappId.endsWith('@g.us')) {
+        return true;
+    }
     const result = await socket.onWhatsApp(whatsappId);
     return !!result?.[0]?.exists;
 }

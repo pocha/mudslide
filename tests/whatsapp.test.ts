@@ -58,6 +58,12 @@ test('check number exists on whatsapp', async () => {
     expect(await checkNumberExistsOnWhatsApp(socket, '3161234567890@s.whatsapp.net')).toBe(true);
 })
 
+test('check number exists on whatsapp, group ids skip the check', async () => {
+    const socket = {onWhatsApp: async () => [{exists: false}]};
+
+    expect(await checkNumberExistsOnWhatsApp(socket, '123456789-987654321@g.us')).toBe(true);
+})
+
 test('wait for delivery ack, resolves once the status update arrives', async () => {
     let onUpdate: (updates: any[]) => void;
     const socket = {ev: {on: (_: string, cb: any) => onUpdate = cb, off: () => {}}};
